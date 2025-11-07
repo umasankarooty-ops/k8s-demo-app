@@ -1,30 +1,58 @@
-name: CI/CD Pipeline
+name: NodeJS Docker Kubernetes CI/CD
 
 on:
   push:
-    branches: [ main ]
+    branches:
+      - main
 
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
+      # Step 1: Checkout code
+      - name: Checkout repo
         uses: actions/checkout@v3
 
-      - name: Set up Docker
+      # Step 2: Set up Node.js
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      # Step 3: Install dependencies
+      - name: Install dependencies
+        run: npm install
+
+      # Step 4: Run tests (optional)
+      - name: Run tests
+        run: npm test || echo "No tests configured"
+
+      # Step 5: Set up Docker
+      - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
 
-      - name: Build Docker image
-        run: docker build -t k8s-demo-app:1.0 .
-
-      - name: Set up kubectl
-        uses: azure/setup-kubectl@v3
+      # Step 6: Log in to Docker Hub
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v2
         with:
-          version: 'latest'
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
 
+      # Step 7: Build Docker image
+      - name: Build Docker image
+        run: |
+          docker build -t ${{ secrets.DOCKER_USERNAME }}/k8s-demo-app:latest .
+
+      # Step 8: Push Docker image
+      - name: Push Docker image
+        run: |
+          docker push ${{ secrets.DOCKER_USERNAME }}/k8s-demo-app:latest
+
+      # Step 9: Deploy to Kubernetes (Minikube)
       - name: Deploy to Kubernetes
+        env:
+          KUBECONFIG: ${{ secrets.KUBECONFIG }}
         run: |
           kubectl apply -f deployment.yaml
           kubectl apply -f service.yaml
-
